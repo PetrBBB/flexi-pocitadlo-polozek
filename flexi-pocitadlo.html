@@ -232,10 +232,10 @@ function log(msg) {
 }
 
 async function fetchCount(companyUrl, agenda, dateFrom, dateTo) {
-  const filter    = `${agenda.datField}>='${dateFrom}' AND ${agenda.datField}<='${dateTo}'`;
+  const filter    = `(${agenda.datField}>='${dateFrom}' and ${agenda.datField}<='${dateTo}')`;
   const proxyBase = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
   const apiPath   = companyUrl.replace(/\/$/, '').replace(/^https?:\/\/[^/]+/, '');
-  const url       = `${proxyBase}${apiPath}/${agenda.endpoint}.json?detail=id&limit=1&add-row-count=true&filter=${encodeURIComponent(filter)}`;
+  const url       = `${proxyBase}${apiPath}/${agenda.endpoint}/${encodeURIComponent(filter)}.json?detail=id&limit=1&add-row-count=true`;
   const t0        = Date.now();
   const resp      = await fetch(url, {
     headers: { 'Authorization': getAuthHeader(), 'Accept': 'application/json' }
