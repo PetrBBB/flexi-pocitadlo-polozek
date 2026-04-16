@@ -143,6 +143,17 @@
         <tbody id="detailBody"></tbody>
       </table>
     </div>
+    <div class="card" id="mzdyCard" style="display:none;">
+      <div class="card-title" style="margin-bottom:12px;">Mzdy (aktualizace mezd)</div>
+      <table>
+        <thead><tr><th>Měsíc</th><th>Počet mezd</th><th>Stav</th><th>Načteno za</th></tr></thead>
+        <tbody id="mzdyBody"></tbody>
+      </table>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0ede5;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;color:#888;">Celkem mezd za období</span>
+        <strong id="mzdyCelkem" style="font-size:16px;">—</strong>
+      </div>
+    </div>
     <div class="log" id="logBox"></div>
   </div>
 </div>
@@ -311,6 +322,35 @@ async function fetchCount(agenda, dateFrom, dateTo) {
   return { count: Number(count), elapsed: ((Date.now() - t0) / 1000).toFixed(1) };
 }
 
+async function fetchMzdyMonth(rok, mesic) {
+  const filter = `(rok='${rok}' and mesic='${mesic}')`;
+  const url    = `${PROXY}/c/${selectedDbName}/mzda/${encodeURIComponent(filter)}.json?detail=id&limit=1&add-row-count=true`;
+  const t0     = Date.now();
+  const resp   = await fetch(url, {
+    headers: { 'Authorization': getAuthHeader(), 'Accept': 'application/json' }
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const data  = await resp.json();
+  const count = data?.winstrom?.['@rowCount'] ?? 0;
+  return { count: Number(count), elapsed: ((Date.now() - t0) / 1000).toFixed(1) };
+}
+
+function getMonthsInRange(from, to) {
+  const months = [];
+  const [fy, fm] = from.split('-').map(Number);
+  const [ty, tm] = to.split('-').map(Number);
+  let y = fy, m = fm;
+  while (y < ty || (y === ty && m <= tm)) {
+    months.push({ rok: y, mesic: m });
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return months;
+}
+
+const MESICE = ['', 'Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen',
+                'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec'];
+
 async function runCalc() {
   if (!selectedDbName) { alert('Nejdříve vyberte firmu ze seznamu.'); return; }
   const range = getDateRange();
@@ -321,6 +361,9 @@ async function runCalc() {
   document.getElementById('results').style.display = 'block';
   document.getElementById('metricsGrid').innerHTML  = '';
   document.getElementById('detailBody').innerHTML   = '';
+  document.getElementById('mzdyBody').innerHTML     = '';
+  document.getElementById('mzdyCard').style.display = 'none';
+  document.getElementById('mzdyCelkem').textContent = '—';
   document.getElementById('logBox').textContent     = '';
   document.getElementById('runBtn').disabled        = true;
   document.getElementById('progBar').style.width    = '5%';
@@ -331,7 +374,11 @@ async function runCalc() {
   log('─────────────────────────────────────────');
 
   let totalCount = 0, errors = 0;
+  const months = getMonthsInRange(range.from.substring(0, 7), range.to.substring(0, 7));
+  const totalSteps = activeAgendas.length + months.length;
+  let step = 0;
 
+  // Agendy
   for (let i = 0; i < activeAgendas.length; i++) {
     const a  = activeAgendas[i];
     const tr = document.createElement('tr');
@@ -348,16 +395,45 @@ async function runCalc() {
       tr.innerHTML = `<td>${a.label}</td><td>—</td><td><span class="badge badge-err">chyba</span></td><td>—</td>`;
       log('  ✗ Chyba: ' + e.message);
     }
-    document.getElementById('progBar').style.width = Math.round(10 + (i + 1) / activeAgendas.length * 85) + '%';
+    step++;
+    document.getElementById('progBar').style.width = Math.round(5 + step / totalSteps * 85) + '%';
   }
 
+  // Mzdy
+  log('─────────────────────────────────────────');
+  log('Načítám mzdy po měsících…');
+  document.getElementById('mzdyCard').style.display = 'block';
+  let mzdyCelkem = 0, mzdyErrors = 0;
+
+  for (const { rok, mesic } of months) {
+    const label = `${MESICE[mesic]} ${rok}`;
+    const tr    = document.createElement('tr');
+    tr.innerHTML = `<td>${label}</td><td>—</td><td><span class="badge badge-wait">načítám…</span></td><td>—</td>`;
+    document.getElementById('mzdyBody').appendChild(tr);
+    try {
+      const res = await fetchMzdyMonth(rok, mesic);
+      mzdyCelkem += res.count;
+      tr.innerHTML = `<td>${label}</td><td><strong>${res.count.toLocaleString('cs-CZ')}</strong></td><td><span class="badge badge-ok">ok</span></td><td>${res.elapsed} s</td>`;
+      log(`  ✓ ${label}: ${res.count} mezd`);
+    } catch (e) {
+      mzdyErrors++;
+      tr.innerHTML = `<td>${label}</td><td>—</td><td><span class="badge badge-err">chyba</span></td><td>—</td>`;
+      log(`  ✗ ${label}: Chyba: ${e.message}`);
+    }
+    step++;
+    document.getElementById('progBar').style.width = Math.round(5 + step / totalSteps * 85) + '%';
+  }
+
+  document.getElementById('mzdyCelkem').textContent = mzdyCelkem.toLocaleString('cs-CZ') + ' mezd';
   document.getElementById('progBar').style.width = '100%';
   log('─────────────────────────────────────────');
-  log('Celkem: ' + totalCount.toLocaleString('cs-CZ') + ' položek' + (errors ? ' | ' + errors + ' agenda(y) s chybou' : ''));
+  log('Celkem položek: ' + totalCount.toLocaleString('cs-CZ') + (errors ? ' | ' + errors + ' chyb' : ''));
+  log('Celkem mezd:    ' + mzdyCelkem.toLocaleString('cs-CZ') + (mzdyErrors ? ' | ' + mzdyErrors + ' chyb' : ''));
 
   const company2 = allCompanies.find(c => c.dbNazev === selectedDbName);
   document.getElementById('metricsGrid').innerHTML = `
     <div class="metric"><div class="metric-label">Celkem položek</div><div class="metric-value">${totalCount.toLocaleString('cs-CZ')}</div><div class="metric-sub">za ${range.label}</div></div>
+    <div class="metric"><div class="metric-label">Celkem mezd</div><div class="metric-value">${mzdyCelkem.toLocaleString('cs-CZ')}</div><div class="metric-sub">za ${range.label}</div></div>
     <div class="metric"><div class="metric-label">Úspěšné agendy</div><div class="metric-value">${activeAgendas.length - errors} / ${activeAgendas.length}</div><div class="metric-sub">${errors ? errors + ' s chybou' : 'vše ok'}</div></div>
     <div class="metric"><div class="metric-label">Firma</div><div class="metric-value" style="font-size:13px;padding-top:6px;line-height:1.4;">${company2 ? company2.nazev : selectedDbName}</div></div>
   `;
