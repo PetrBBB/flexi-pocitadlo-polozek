@@ -165,7 +165,7 @@ async function checkConnection() {
   try {
     const proxyBase = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
     const apiPath   = cu.replace(/\/$/, '').replace(/^https?:\/\/[^/]+/, '');
-    const resp = await fetch(`${proxyBase}${apiPath}/faktura-vydana/$count.json`, {
+    const resp = await fetch(`${proxyBase}${apiPath}/faktura-vydana.json?detail=id&limit=1&add-row-count=true`, {
       headers: { 'Authorization': getAuthHeader(), 'Accept': 'application/json' },
       signal: AbortSignal.timeout(5000)
     });
@@ -232,17 +232,17 @@ function log(msg) {
 }
 
 async function fetchCount(companyUrl, agenda, dateFrom, dateTo) {
-  const filter = `${agenda.datField}>='${dateFrom}' AND ${agenda.datField}<='${dateTo}'`;
+  const filter    = `${agenda.datField}>='${dateFrom}' AND ${agenda.datField}<='${dateTo}'`;
   const proxyBase = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
   const apiPath   = companyUrl.replace(/\/$/, '').replace(/^https?:\/\/[^/]+/, '');
-  const url       = `${proxyBase}${apiPath}/${agenda.endpoint}/$count.json?filter=${encodeURIComponent(filter)}`;
+  const url       = `${proxyBase}${apiPath}/${agenda.endpoint}.json?detail=id&limit=1&add-row-count=true&filter=${encodeURIComponent(filter)}`;
   const t0        = Date.now();
   const resp      = await fetch(url, {
     headers: { 'Authorization': getAuthHeader(), 'Accept': 'application/json' }
   });
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
   const data  = await resp.json();
-  const count = data?.winstrom?.['@rowCount'] ?? data?.count ?? 0;
+  const count = data?.winstrom?.['@rowCount'] ?? 0;
   return { count: Number(count), elapsed: ((Date.now() - t0) / 1000).toFixed(1) };
 }
 
