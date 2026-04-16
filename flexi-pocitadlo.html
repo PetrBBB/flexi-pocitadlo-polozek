@@ -139,7 +139,7 @@ const authTokenParam  = params.get('authSessionId') || '';
 function initParams() {
   if (companyUrlParam) document.getElementById('companyUrl').value = companyUrlParam;
   if (authTokenParam)  document.getElementById('authToken').value  = authTokenParam;
-  checkConnection();
+  setTimeout(checkConnection, 100);
 }
 
 async function checkConnection() {
