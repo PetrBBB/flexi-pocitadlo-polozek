@@ -61,16 +61,23 @@
 
   <div class="card">
     <div class="card-title">Připojení</div>
-    <div class="status-bar status-warn" id="statusBar">Zjišťuji připojení...</div>
-    <div class="row2">
+    <div class="status-bar status-warn" id="statusBar">Vyplňte přihlašovací údaje.</div>
+    <div class="row3">
       <div class="field">
         <label>API adresa firmy</label>
         <input type="text" id="companyUrl" placeholder="https://ucetnictvi-bp0.flexibee.eu/c/firma" />
       </div>
       <div class="field">
-        <label>Session token</label>
-        <input type="text" id="authToken" placeholder="Předáno automaticky z FlexiBee" />
+        <label>Uživatel</label>
+        <input type="text" id="flexi_user" placeholder="admin" />
       </div>
+      <div class="field">
+        <label>Heslo</label>
+        <input type="password" id="flexi_pass" placeholder="••••••••" />
+      </div>
+    </div>
+    <div style="margin-top:10px;">
+      <button onclick="checkConnection()" style="padding:6px 14px;border:1px solid #d5d3cb;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;">Ověřit připojení</button>
     </div>
   </div>
 
@@ -131,24 +138,26 @@ const AGENDAS = [
 
 let selected = new Set(AGENDAS.map(a => a.key));
 
-// Načti parametry z URL (předané FlexiBee tlačítkem)
 const params = new URLSearchParams(window.location.search);
 const companyUrlParam = params.get('companyUrl') || '';
-const authTokenParam  = params.get('authSessionId') || '';
 
 function initParams() {
   if (companyUrlParam) document.getElementById('companyUrl').value = companyUrlParam;
-  if (authTokenParam)  document.getElementById('authToken').value  = authTokenParam;
-  setTimeout(checkConnection, 100);
+}
+
+function getAuthHeader() {
+  const user = document.getElementById('flexi_user').value.trim();
+  const pass = document.getElementById('flexi_pass').value;
+  return 'Basic ' + btoa(user + ':' + pass);
 }
 
 async function checkConnection() {
   const bar = document.getElementById('statusBar');
   const cu  = document.getElementById('companyUrl').value.trim();
-  const tok = document.getElementById('authToken').value.trim();
-  if (!cu || !tok) {
+  const user = document.getElementById('flexi_user').value.trim();
+  if (!cu || !user) {
     bar.className = 'status-bar status-warn';
-    bar.textContent = 'Vyplňte API adresu firmy a session token (nebo otevřete přes tlačítko ve FlexiBee).';
+    bar.textContent = 'Vyplňte API adresu firmy a přihlašovací údaje.';
     return;
   }
   bar.className = 'status-bar status-warn';
@@ -157,7 +166,7 @@ async function checkConnection() {
     const proxyBase = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
     const apiPath   = cu.replace(/\/$/, '').replace(/^https?:\/\/[^/]+/, '');
     const resp = await fetch(`${proxyBase}${apiPath}/faktura-vydana/$count.json`, {
-      headers: { 'Authorization': `authSessionId ${tok}`, 'Accept': 'application/json' },
+      headers: { 'Authorization': getAuthHeader(), 'Accept': 'application/json' },
       signal: AbortSignal.timeout(5000)
     });
     if (resp.ok) {
@@ -165,7 +174,7 @@ async function checkConnection() {
       bar.textContent = 'Připojeno: ' + cu;
     } else {
       bar.className = 'status-bar status-err';
-      bar.textContent = 'Chyba připojení: HTTP ' + resp.status + ' – zkontrolujte token nebo adresu.';
+      bar.textContent = 'Chyba připojení: HTTP ' + resp.status + ' – zkontrolujte údaje.';
     }
   } catch (e) {
     bar.className = 'status-bar status-err';
@@ -222,14 +231,14 @@ function log(msg) {
   box.scrollTop = box.scrollHeight;
 }
 
-async function fetchCount(companyUrl, token, agenda, dateFrom, dateTo) {
+async function fetchCount(companyUrl, agenda, dateFrom, dateTo) {
   const filter = `${agenda.datField}>='${dateFrom}' AND ${agenda.datField}<='${dateTo}'`;
   const proxyBase = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
   const apiPath   = companyUrl.replace(/\/$/, '').replace(/^https?:\/\/[^/]+/, '');
   const url       = `${proxyBase}${apiPath}/${agenda.endpoint}/$count.json?filter=${encodeURIComponent(filter)}`;
   const t0        = Date.now();
   const resp      = await fetch(url, {
-    headers: { 'Authorization': `authSessionId ${token}`, 'Accept': 'application/json' }
+    headers: { 'Authorization': getAuthHeader(), 'Accept': 'application/json' }
   });
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
   const data  = await resp.json();
@@ -239,10 +248,11 @@ async function fetchCount(companyUrl, token, agenda, dateFrom, dateTo) {
 
 async function runCalc() {
   const companyUrl = document.getElementById('companyUrl').value.trim();
-  const token      = document.getElementById('authToken').value.trim();
+  const user       = document.getElementById('flexi_user').value.trim();
+  const pass       = document.getElementById('flexi_pass').value;
   const range      = getDateRange();
 
-  if (!companyUrl || !token) { alert('Chybí API adresa firmy nebo session token.'); return; }
+  if (!companyUrl || !user || !pass) { alert('Vyplňte API adresu firmy, uživatele a heslo.'); return; }
   if (!range) { alert('Zvolte prosím období.'); return; }
 
   const activeAgendas = AGENDAS.filter(a => selected.has(a.key));
@@ -268,7 +278,7 @@ async function runCalc() {
     document.getElementById('detailBody').appendChild(tr);
     log('Načítám ' + a.label + '…');
     try {
-      const res = await fetchCount(companyUrl, token, a, range.from, range.to);
+      const res = await fetchCount(companyUrl, a, range.from, range.to);
       totalCount += res.count;
       tr.innerHTML = `<td>${a.label}</td><td><strong>${res.count.toLocaleString('cs-CZ')}</strong></td><td><span class="badge badge-ok">ok</span></td><td>${res.elapsed} s</td>`;
       log('  ✓ ' + res.count.toLocaleString('cs-CZ') + ' položek');
