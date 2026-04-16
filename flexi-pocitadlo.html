@@ -8,7 +8,7 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #f4f4f0; color: #1a1a18; min-height: 100vh; padding: 2rem 1rem; }
   .container { max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; color: #1a1a18; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; }
   h1 span { font-weight: 400; color: #888; font-size: 15px; margin-left: 8px; }
   .card { background: #fff; border: 1px solid #e2e0d8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
   .card-title { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; margin-bottom: 12px; }
@@ -22,7 +22,7 @@
   .agenda-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #d5d3cb; border-radius: 8px; cursor: pointer; font-size: 14px; color: #1a1a18; background: #fff; transition: all 0.12s; user-select: none; }
   .agenda-item:hover { background: #f4f4f0; }
   .agenda-item.active { border-color: #3a7fd5; background: #eaf2fb; color: #1a4a8a; }
-  .agenda-item .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; flex-shrink: 0; transition: background 0.12s; }
+  .agenda-item .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
   .agenda-item.active .dot { background: #3a7fd5; }
   .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .select-all { font-size: 12px; color: #3a7fd5; cursor: pointer; }
@@ -42,12 +42,16 @@
   tr:last-child td { border-bottom: none; }
   .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; }
   .badge-ok { background: #e2f4ea; color: #1a6b35; }
-  .badge-warn { background: #fdf3dc; color: #8a5a00; }
   .badge-err { background: #fde8e8; color: #8a1a1a; }
   .badge-wait { background: #f0ede5; color: #888; }
   .progress { height: 3px; background: #e8e6de; border-radius: 2px; margin: 12px 0; overflow: hidden; }
   .progress-bar { height: 100%; background: #3a7fd5; border-radius: 2px; transition: width 0.3s; width: 0%; }
   .log { font-size: 12px; color: #666; font-family: monospace; background: #f4f4f0; border-radius: 8px; padding: 10px 12px; max-height: 130px; overflow-y: auto; white-space: pre-wrap; margin-top: 10px; }
+  .status-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; }
+  .status-ok  { background: #e2f4ea; color: #1a6b35; }
+  .status-err { background: #fde8e8; color: #8a1a1a; }
+  .status-warn { background: #fdf3dc; color: #8a5a00; }
+  code { font-family: monospace; background: #f0ede5; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
   @media (max-width: 500px) { .row2, .row3, .agendas-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -56,25 +60,16 @@
   <h1>FlexiBee <span>počítadlo položek</span></h1>
 
   <div class="card">
-    <div class="card-title">Připojení k serveru</div>
-    <div class="row2" style="margin-bottom:12px;">
-      <div class="field">
-        <label>URL serveru</label>
-        <input type="text" id="serverUrl" placeholder="https://localhost:5434" value="https://localhost:5434" />
-      </div>
-      <div class="field">
-        <label>Firma (evidenceId)</label>
-        <input type="text" id="firma" placeholder="napr. firma_s_r_o" />
-      </div>
-    </div>
+    <div class="card-title">Připojení</div>
+    <div class="status-bar status-warn" id="statusBar">Zjišťuji připojení...</div>
     <div class="row2">
       <div class="field">
-        <label>Uživatel</label>
-        <input type="text" id="user" placeholder="admin" />
+        <label>API adresa firmy</label>
+        <input type="text" id="companyUrl" placeholder="https://ucetnictvi-bp0.flexibee.eu/c/firma" />
       </div>
       <div class="field">
-        <label>Heslo</label>
-        <input type="password" id="pass" placeholder="••••••••" />
+        <label>Session token</label>
+        <input type="text" id="authToken" placeholder="Předáno automaticky z FlexiBee" />
       </div>
     </div>
   </div>
@@ -126,15 +121,55 @@
 
 <script>
 const AGENDAS = [
-  { key: 'vydane-faktury',      label: 'Vydané faktury',       endpoint: 'faktura-vydana',  datField: 'datVyst' },
-  { key: 'prijate-faktury',     label: 'Přijaté faktury',      endpoint: 'faktura-prijata', datField: 'datVyst' },
-  { key: 'banka',               label: 'Banka',                endpoint: 'banka',           datField: 'datVyst' },
-  { key: 'pokladna',            label: 'Pokladna',             endpoint: 'pokladna',        datField: 'datVyst' },
-  { key: 'ostatni-pohledavky',  label: 'Ostatní pohledávky',   endpoint: 'pohledavka',      datField: 'datVyst' },
-  { key: 'ostatni-zavazky',     label: 'Ostatní závazky',      endpoint: 'zavazek',         datField: 'datVyst' },
+  { key: 'vydane-faktury',     label: 'Vydané faktury',     endpoint: 'faktura-vydana',  datField: 'datVyst' },
+  { key: 'prijate-faktury',    label: 'Přijaté faktury',    endpoint: 'faktura-prijata', datField: 'datVyst' },
+  { key: 'banka',              label: 'Banka',              endpoint: 'banka',           datField: 'datVyst' },
+  { key: 'pokladna',           label: 'Pokladna',           endpoint: 'pokladna',        datField: 'datVyst' },
+  { key: 'ostatni-pohledavky', label: 'Ostatní pohledávky', endpoint: 'pohledavka',      datField: 'datVyst' },
+  { key: 'ostatni-zavazky',    label: 'Ostatní závazky',    endpoint: 'zavazek',         datField: 'datVyst' },
 ];
 
 let selected = new Set(AGENDAS.map(a => a.key));
+
+// Načti parametry z URL (předané FlexiBee tlačítkem)
+const params = new URLSearchParams(window.location.search);
+const companyUrlParam = params.get('companyUrl') || '';
+const authTokenParam  = params.get('authSessionId') || '';
+
+function initParams() {
+  if (companyUrlParam) document.getElementById('companyUrl').value = companyUrlParam;
+  if (authTokenParam)  document.getElementById('authToken').value  = authTokenParam;
+  checkConnection();
+}
+
+async function checkConnection() {
+  const bar = document.getElementById('statusBar');
+  const cu  = document.getElementById('companyUrl').value.trim();
+  const tok = document.getElementById('authToken').value.trim();
+  if (!cu || !tok) {
+    bar.className = 'status-bar status-warn';
+    bar.textContent = 'Vyplňte API adresu firmy a session token (nebo otevřete přes tlačítko ve FlexiBee).';
+    return;
+  }
+  bar.className = 'status-bar status-warn';
+  bar.textContent = 'Ověřuji připojení...';
+  try {
+    const resp = await fetch(`${cu.replace(/\/$/, '')}/faktura-vydana/$count.json`, {
+      headers: { 'Authorization': `authSessionId ${tok}`, 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (resp.ok) {
+      bar.className = 'status-bar status-ok';
+      bar.textContent = 'Připojeno: ' + cu;
+    } else {
+      bar.className = 'status-bar status-err';
+      bar.textContent = 'Chyba připojení: HTTP ' + resp.status + ' – zkontrolujte token nebo adresu.';
+    }
+  } catch (e) {
+    bar.className = 'status-bar status-err';
+    bar.textContent = 'Nelze se připojit: ' + e.message;
+  }
+}
 
 function initAgendas() {
   const grid = document.getElementById('agendaGrid');
@@ -161,19 +196,22 @@ function toggleAll() {
 }
 
 function updatePeriod() {
-  const t = document.getElementById('periodType').value;
-  document.getElementById('monthToField').style.display = t === 'range' ? '' : 'none';
+  document.getElementById('monthToField').style.display =
+    document.getElementById('periodType').value === 'range' ? '' : 'none';
 }
 
 function getDateRange() {
-  const t = document.getElementById('periodType').value;
+  const t    = document.getElementById('periodType').value;
   const from = document.getElementById('monthFrom').value;
   if (!from) return null;
-  const fromDate = from + '-01';
-  let toVal = (t === 'range') ? (document.getElementById('monthTo').value || from) : from;
+  let toVal  = (t === 'range') ? (document.getElementById('monthTo').value || from) : from;
   const [ty, tm] = toVal.split('-').map(Number);
-  const lastDay = new Date(ty, tm, 0).getDate();
-  return { from: fromDate, to: toVal + '-' + String(lastDay).padStart(2, '0'), label: t === 'range' ? from + ' – ' + toVal : from };
+  const lastDay  = new Date(ty, tm, 0).getDate();
+  return {
+    from:  from + '-01',
+    to:    toVal + '-' + String(lastDay).padStart(2, '0'),
+    label: t === 'range' ? from + ' – ' + toVal : from
+  };
 }
 
 function log(msg) {
@@ -182,59 +220,51 @@ function log(msg) {
   box.scrollTop = box.scrollHeight;
 }
 
-function setProgress(pct) {
-  document.getElementById('progBar').style.width = pct + '%';
-}
-
-async function fetchCount(baseUrl, firma, user, pass, agenda, dateFrom, dateTo) {
+async function fetchCount(companyUrl, token, agenda, dateFrom, dateTo) {
   const filter = `${agenda.datField}>='${dateFrom}' AND ${agenda.datField}<='${dateTo}'`;
-  const url = `${baseUrl}/c/${firma}/${agenda.endpoint}/$count.json?filter=${encodeURIComponent(filter)}`;
-  const t0 = Date.now();
-  const resp = await fetch(url, {
-    headers: { 'Authorization': 'Basic ' + btoa(user + ':' + pass), 'Accept': 'application/json' }
+  const url    = `${companyUrl.replace(/\/$/, '')}/${agenda.endpoint}/$count.json?filter=${encodeURIComponent(filter)}`;
+  const t0     = Date.now();
+  const resp   = await fetch(url, {
+    headers: { 'Authorization': `authSessionId ${token}`, 'Accept': 'application/json' }
   });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' – ' + resp.statusText);
-  const data = await resp.json();
-  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const data  = await resp.json();
   const count = data?.winstrom?.['@rowCount'] ?? data?.count ?? 0;
-  return { count: Number(count), elapsed };
+  return { count: Number(count), elapsed: ((Date.now() - t0) / 1000).toFixed(1) };
 }
 
 async function runCalc() {
-  const serverUrl = document.getElementById('serverUrl').value.replace(/\/$/, '');
-  const firma = document.getElementById('firma').value.trim();
-  const user = document.getElementById('user').value.trim();
-  const pass = document.getElementById('pass').value;
-  const range = getDateRange();
+  const companyUrl = document.getElementById('companyUrl').value.trim();
+  const token      = document.getElementById('authToken').value.trim();
+  const range      = getDateRange();
 
-  if (!serverUrl || !firma || !user || !range) { alert('Vyplňte prosím všechna pole a zvolte období.'); return; }
+  if (!companyUrl || !token) { alert('Chybí API adresa firmy nebo session token.'); return; }
+  if (!range) { alert('Zvolte prosím období.'); return; }
 
   const activeAgendas = AGENDAS.filter(a => selected.has(a.key));
   if (!activeAgendas.length) { alert('Vyberte alespoň jednu agendu.'); return; }
 
   document.getElementById('results').style.display = 'block';
-  document.getElementById('metricsGrid').innerHTML = '';
-  document.getElementById('detailBody').innerHTML = '';
-  document.getElementById('logBox').textContent = '';
-  document.getElementById('runBtn').disabled = true;
-  setProgress(5);
+  document.getElementById('metricsGrid').innerHTML  = '';
+  document.getElementById('detailBody').innerHTML   = '';
+  document.getElementById('logBox').textContent     = '';
+  document.getElementById('runBtn').disabled        = true;
+  document.getElementById('progBar').style.width    = '5%';
 
   log('Období: ' + range.from + ' až ' + range.to);
-  log('Server: ' + serverUrl + ' | Firma: ' + firma);
+  log('Firma:  ' + companyUrl);
   log('─────────────────────────────────────────');
 
   let totalCount = 0, errors = 0;
 
   for (let i = 0; i < activeAgendas.length; i++) {
-    const a = activeAgendas[i];
-    const tbody = document.getElementById('detailBody');
+    const a  = activeAgendas[i];
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${a.label}</td><td>—</td><td><span class="badge badge-wait">načítám…</span></td><td>—</td>`;
-    tbody.appendChild(tr);
+    document.getElementById('detailBody').appendChild(tr);
     log('Načítám ' + a.label + '…');
-
     try {
-      const res = await fetchCount(serverUrl, firma, user, pass, a, range.from, range.to);
+      const res = await fetchCount(companyUrl, token, a, range.from, range.to);
       totalCount += res.count;
       tr.innerHTML = `<td>${a.label}</td><td><strong>${res.count.toLocaleString('cs-CZ')}</strong></td><td><span class="badge badge-ok">ok</span></td><td>${res.elapsed} s</td>`;
       log('  ✓ ' + res.count.toLocaleString('cs-CZ') + ' položek');
@@ -243,28 +273,27 @@ async function runCalc() {
       tr.innerHTML = `<td>${a.label}</td><td>—</td><td><span class="badge badge-err">chyba</span></td><td>—</td>`;
       log('  ✗ Chyba: ' + e.message);
     }
-    setProgress(Math.round(10 + (i + 1) / activeAgendas.length * 85));
+    document.getElementById('progBar').style.width = Math.round(10 + (i + 1) / activeAgendas.length * 85) + '%';
   }
 
-  setProgress(100);
+  document.getElementById('progBar').style.width = '100%';
   log('─────────────────────────────────────────');
   log('Celkem: ' + totalCount.toLocaleString('cs-CZ') + ' položek' + (errors ? ' | ' + errors + ' agenda(y) s chybou' : ''));
 
   document.getElementById('metricsGrid').innerHTML = `
     <div class="metric"><div class="metric-label">Celkem položek</div><div class="metric-value">${totalCount.toLocaleString('cs-CZ')}</div><div class="metric-sub">za ${range.label}</div></div>
     <div class="metric"><div class="metric-label">Úspěšné agendy</div><div class="metric-value">${activeAgendas.length - errors} / ${activeAgendas.length}</div><div class="metric-sub">${errors ? errors + ' s chybou' : 'vše ok'}</div></div>
-    <div class="metric"><div class="metric-label">Firma</div><div class="metric-value" style="font-size:15px;padding-top:5px;">${firma}</div><div class="metric-sub">${serverUrl.replace(/https?:\/\//, '')}</div></div>
+    <div class="metric"><div class="metric-label">Firma</div><div class="metric-value" style="font-size:14px;padding-top:6px;">${companyUrl.split('/').pop()}</div><div class="metric-sub">${companyUrl.split('/')[2]}</div></div>
   `;
-
   document.getElementById('runBtn').disabled = false;
 }
 
-// init
+// Init
 const now = new Date();
-const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-document.getElementById('monthFrom').value = ym;
-document.getElementById('monthTo').value = ym;
+document.getElementById('monthFrom').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+document.getElementById('monthTo').value   = document.getElementById('monthFrom').value;
 initAgendas();
+initParams();
 </script>
 </body>
 </html>
