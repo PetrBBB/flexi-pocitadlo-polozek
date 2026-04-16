@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlexiBee – Počítadlo položek</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f4f4f0; color: #1a1a18; min-height: 100vh; padding: 2rem 1rem; }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; color: #1a1a18; }
+  h1 span { font-weight: 400; color: #888; font-size: 15px; margin-left: 8px; }
+  .card { background: #fff; border: 1px solid #e2e0d8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; margin-bottom: 12px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 13px; color: #555; }
+  input, select { width: 100%; padding: 8px 10px; border: 1px solid #d5d3cb; border-radius: 8px; font-size: 14px; background: #fff; color: #1a1a18; font-family: inherit; }
+  input:focus, select:focus { outline: none; border-color: #888; }
+  .agendas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .agenda-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #d5d3cb; border-radius: 8px; cursor: pointer; font-size: 14px; color: #1a1a18; background: #fff; transition: all 0.12s; user-select: none; }
+  .agenda-item:hover { background: #f4f4f0; }
+  .agenda-item.active { border-color: #3a7fd5; background: #eaf2fb; color: #1a4a8a; }
+  .agenda-item .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; flex-shrink: 0; transition: background 0.12s; }
+  .agenda-item.active .dot { background: #3a7fd5; }
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .select-all { font-size: 12px; color: #3a7fd5; cursor: pointer; }
+  .select-all:hover { text-decoration: underline; }
+  .run-btn { width: 100%; padding: 11px; font-size: 15px; font-weight: 600; border-radius: 10px; background: #1a1a18; color: #fff; border: none; cursor: pointer; margin-top: 4px; transition: opacity 0.15s; }
+  .run-btn:hover { opacity: 0.82; }
+  .run-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .results { margin-top: 1.25rem; display: none; }
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 1rem; }
+  .metric { background: #f4f4f0; border-radius: 10px; padding: 1rem; }
+  .metric-label { font-size: 12px; color: #888; margin-bottom: 5px; }
+  .metric-value { font-size: 24px; font-weight: 600; color: #1a1a18; }
+  .metric-sub { font-size: 12px; color: #aaa; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 6px 8px; color: #888; border-bottom: 1px solid #e8e6de; font-weight: 500; }
+  td { padding: 8px 8px; border-bottom: 1px solid #f0ede5; color: #1a1a18; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; }
+  .badge-ok { background: #e2f4ea; color: #1a6b35; }
+  .badge-warn { background: #fdf3dc; color: #8a5a00; }
+  .badge-err { background: #fde8e8; color: #8a1a1a; }
+  .badge-wait { background: #f0ede5; color: #888; }
+  .progress { height: 3px; background: #e8e6de; border-radius: 2px; margin: 12px 0; overflow: hidden; }
+  .progress-bar { height: 100%; background: #3a7fd5; border-radius: 2px; transition: width 0.3s; width: 0%; }
+  .log { font-size: 12px; color: #666; font-family: monospace; background: #f4f4f0; border-radius: 8px; padding: 10px 12px; max-height: 130px; overflow-y: auto; white-space: pre-wrap; margin-top: 10px; }
+  @media (max-width: 500px) { .row2, .row3, .agendas-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>FlexiBee <span>počítadlo položek</span></h1>
+
+  <div class="card">
+    <div class="card-title">Připojení k serveru</div>
+    <div class="row2" style="margin-bottom:12px;">
+      <div class="field">
+        <label>URL serveru</label>
+        <input type="text" id="serverUrl" placeholder="https://localhost:5434" value="https://localhost:5434" />
+      </div>
+      <div class="field">
+        <label>Firma (evidenceId)</label>
+        <input type="text" id="firma" placeholder="napr. firma_s_r_o" />
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Uživatel</label>
+        <input type="text" id="user" placeholder="admin" />
+      </div>
+      <div class="field">
+        <label>Heslo</label>
+        <input type="password" id="pass" placeholder="••••••••" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Období</div>
+    <div class="row3">
+      <div class="field">
+        <label>Typ období</label>
+        <select id="periodType" onchange="updatePeriod()">
+          <option value="month">Jeden měsíc</option>
+          <option value="range">Rozsah měsíců</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Měsíc od</label>
+        <input type="month" id="monthFrom" />
+      </div>
+      <div class="field" id="monthToField" style="display:none;">
+        <label>Měsíc do</label>
+        <input type="month" id="monthTo" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toggle-row">
+      <div class="card-title" style="margin-bottom:0;">Agendy</div>
+      <span class="select-all" onclick="toggleAll()">Vybrat vše / Zrušit</span>
+    </div>
+    <div class="agendas-grid" id="agendaGrid"></div>
+  </div>
+
+  <button class="run-btn" id="runBtn" onclick="runCalc()">Spočítat položky</button>
+
+  <div class="results" id="results">
+    <div class="progress"><div class="progress-bar" id="progBar"></div></div>
+    <div class="metrics-grid" id="metricsGrid"></div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px;">Detail dle agendy</div>
+      <table>
+        <thead><tr><th>Agenda</th><th>Počet položek</th><th>Stav</th><th>Načteno za</th></tr></thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+    </div>
+    <div class="log" id="logBox"></div>
+  </div>
+</div>
+
+<script>
+const AGENDAS = [
+  { key: 'vydane-faktury',      label: 'Vydané faktury',       endpoint: 'faktura-vydana',  datField: 'datVyst' },
+  { key: 'prijate-faktury',     label: 'Přijaté faktury',      endpoint: 'faktura-prijata', datField: 'datVyst' },
+  { key: 'banka',               label: 'Banka',                endpoint: 'banka',           datField: 'datVyst' },
+  { key: 'pokladna',            label: 'Pokladna',             endpoint: 'pokladna',        datField: 'datVyst' },
+  { key: 'ostatni-pohledavky',  label: 'Ostatní pohledávky',   endpoint: 'pohledavka',      datField: 'datVyst' },
+  { key: 'ostatni-zavazky',     label: 'Ostatní závazky',      endpoint: 'zavazek',         datField: 'datVyst' },
+];
+
+let selected = new Set(AGENDAS.map(a => a.key));
+
+function initAgendas() {
+  const grid = document.getElementById('agendaGrid');
+  AGENDAS.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'agenda-item active';
+    el.id = 'ag_' + a.key;
+    el.innerHTML = `<span class="dot"></span><span>${a.label}</span>`;
+    el.onclick = () => {
+      if (selected.has(a.key)) { selected.delete(a.key); el.classList.remove('active'); }
+      else { selected.add(a.key); el.classList.add('active'); }
+    };
+    grid.appendChild(el);
+  });
+}
+
+function toggleAll() {
+  if (selected.size === AGENDAS.length) {
+    selected.clear();
+    AGENDAS.forEach(a => document.getElementById('ag_' + a.key).classList.remove('active'));
+  } else {
+    AGENDAS.forEach(a => { selected.add(a.key); document.getElementById('ag_' + a.key).classList.add('active'); });
+  }
+}
+
+function updatePeriod() {
+  const t = document.getElementById('periodType').value;
+  document.getElementById('monthToField').style.display = t === 'range' ? '' : 'none';
+}
+
+function getDateRange() {
+  const t = document.getElementById('periodType').value;
+  const from = document.getElementById('monthFrom').value;
+  if (!from) return null;
+  const fromDate = from + '-01';
+  let toVal = (t === 'range') ? (document.getElementById('monthTo').value || from) : from;
+  const [ty, tm] = toVal.split('-').map(Number);
+  const lastDay = new Date(ty, tm, 0).getDate();
+  return { from: fromDate, to: toVal + '-' + String(lastDay).padStart(2, '0'), label: t === 'range' ? from + ' – ' + toVal : from };
+}
+
+function log(msg) {
+  const box = document.getElementById('logBox');
+  box.textContent += msg + '\n';
+  box.scrollTop = box.scrollHeight;
+}
+
+function setProgress(pct) {
+  document.getElementById('progBar').style.width = pct + '%';
+}
+
+async function fetchCount(baseUrl, firma, user, pass, agenda, dateFrom, dateTo) {
+  const filter = `${agenda.datField}>='${dateFrom}' AND ${agenda.datField}<='${dateTo}'`;
+  const url = `${baseUrl}/c/${firma}/${agenda.endpoint}/$count.json?filter=${encodeURIComponent(filter)}`;
+  const t0 = Date.now();
+  const resp = await fetch(url, {
+    headers: { 'Authorization': 'Basic ' + btoa(user + ':' + pass), 'Accept': 'application/json' }
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' – ' + resp.statusText);
+  const data = await resp.json();
+  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+  const count = data?.winstrom?.['@rowCount'] ?? data?.count ?? 0;
+  return { count: Number(count), elapsed };
+}
+
+async function runCalc() {
+  const serverUrl = document.getElementById('serverUrl').value.replace(/\/$/, '');
+  const firma = document.getElementById('firma').value.trim();
+  const user = document.getElementById('user').value.trim();
+  const pass = document.getElementById('pass').value;
+  const range = getDateRange();
+
+  if (!serverUrl || !firma || !user || !range) { alert('Vyplňte prosím všechna pole a zvolte období.'); return; }
+
+  const activeAgendas = AGENDAS.filter(a => selected.has(a.key));
+  if (!activeAgendas.length) { alert('Vyberte alespoň jednu agendu.'); return; }
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('metricsGrid').innerHTML = '';
+  document.getElementById('detailBody').innerHTML = '';
+  document.getElementById('logBox').textContent = '';
+  document.getElementById('runBtn').disabled = true;
+  setProgress(5);
+
+  log('Období: ' + range.from + ' až ' + range.to);
+  log('Server: ' + serverUrl + ' | Firma: ' + firma);
+  log('─────────────────────────────────────────');
+
+  let totalCount = 0, errors = 0;
+
+  for (let i = 0; i < activeAgendas.length; i++) {
+    const a = activeAgendas[i];
+    const tbody = document.getElementById('detailBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${a.label}</td><td>—</td><td><span class="badge badge-wait">načítám…</span></td><td>—</td>`;
+    tbody.appendChild(tr);
+    log('Načítám ' + a.label + '…');
+
+    try {
+      const res = await fetchCount(serverUrl, firma, user, pass, a, range.from, range.to);
+      totalCount += res.count;
+      tr.innerHTML = `<td>${a.label}</td><td><strong>${res.count.toLocaleString('cs-CZ')}</strong></td><td><span class="badge badge-ok">ok</span></td><td>${res.elapsed} s</td>`;
+      log('  ✓ ' + res.count.toLocaleString('cs-CZ') + ' položek');
+    } catch (e) {
+      errors++;
+      tr.innerHTML = `<td>${a.label}</td><td>—</td><td><span class="badge badge-err">chyba</span></td><td>—</td>`;
+      log('  ✗ Chyba: ' + e.message);
+    }
+    setProgress(Math.round(10 + (i + 1) / activeAgendas.length * 85));
+  }
+
+  setProgress(100);
+  log('─────────────────────────────────────────');
+  log('Celkem: ' + totalCount.toLocaleString('cs-CZ') + ' položek' + (errors ? ' | ' + errors + ' agenda(y) s chybou' : ''));
+
+  document.getElementById('metricsGrid').innerHTML = `
+    <div class="metric"><div class="metric-label">Celkem položek</div><div class="metric-value">${totalCount.toLocaleString('cs-CZ')}</div><div class="metric-sub">za ${range.label}</div></div>
+    <div class="metric"><div class="metric-label">Úspěšné agendy</div><div class="metric-value">${activeAgendas.length - errors} / ${activeAgendas.length}</div><div class="metric-sub">${errors ? errors + ' s chybou' : 'vše ok'}</div></div>
+    <div class="metric"><div class="metric-label">Firma</div><div class="metric-value" style="font-size:15px;padding-top:5px;">${firma}</div><div class="metric-sub">${serverUrl.replace(/https?:\/\//, '')}</div></div>
+  `;
+
+  document.getElementById('runBtn').disabled = false;
+}
+
+// init
+const now = new Date();
+const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+document.getElementById('monthFrom').value = ym;
+document.getElementById('monthTo').value = ym;
+initAgendas();
+</script>
+</body>
+</html>
