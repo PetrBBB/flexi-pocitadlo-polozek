@@ -7,7 +7,7 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #f4f4f0; color: #1a1a18; min-height: 100vh; padding: 2rem 1rem; }
-  .container { max-width: 720px; margin: 0 auto; }
+  .container { max-width: 760px; margin: 0 auto; }
   h1 { font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; }
   h1 span { font-weight: 400; color: #888; font-size: 15px; margin-left: 8px; }
   .card { background: #fff; border: 1px solid #e2e0d8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
@@ -18,6 +18,23 @@
   .field label { font-size: 13px; color: #555; }
   input, select { width: 100%; padding: 8px 10px; border: 1px solid #d5d3cb; border-radius: 8px; font-size: 14px; background: #fff; color: #1a1a18; font-family: inherit; }
   input:focus, select:focus { outline: none; border-color: #888; }
+  .btn { padding: 7px 14px; border: 1px solid #d5d3cb; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; font-family: inherit; color: #1a1a18; transition: background 0.12s; }
+  .btn:hover { background: #f4f4f0; }
+  .btn-primary { background: #1a1a18; color: #fff; border-color: #1a1a18; font-weight: 600; }
+  .btn-primary:hover { opacity: 0.85; background: #1a1a18; }
+  .status-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
+  .status-ok   { background: #e2f4ea; color: #1a6b35; }
+  .status-err  { background: #fde8e8; color: #8a1a1a; }
+  .status-warn { background: #fdf3dc; color: #8a5a00; }
+  .company-search { width: 100%; margin-bottom: 10px; }
+  .company-list { max-height: 220px; overflow-y: auto; border: 1px solid #e2e0d8; border-radius: 8px; }
+  .company-item { padding: 8px 12px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f0ede5; display: flex; align-items: center; justify-content: space-between; transition: background 0.1s; }
+  .company-item:last-child { border-bottom: none; }
+  .company-item:hover { background: #f4f4f0; }
+  .company-item.active { background: #eaf2fb; color: #1a4a8a; font-weight: 500; }
+  .company-item .dbname { font-size: 11px; color: #aaa; margin-left: 8px; }
+  .company-item.active .dbname { color: #3a7fd5; }
+  .selected-company { font-size: 14px; font-weight: 500; padding: 8px 12px; background: #eaf2fb; color: #1a4a8a; border-radius: 8px; margin-bottom: 10px; display: none; }
   .agendas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .agenda-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #d5d3cb; border-radius: 8px; cursor: pointer; font-size: 14px; color: #1a1a18; background: #fff; transition: all 0.12s; user-select: none; }
   .agenda-item:hover { background: #f4f4f0; }
@@ -41,17 +58,12 @@
   td { padding: 8px 8px; border-bottom: 1px solid #f0ede5; color: #1a1a18; }
   tr:last-child td { border-bottom: none; }
   .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; }
-  .badge-ok { background: #e2f4ea; color: #1a6b35; }
-  .badge-err { background: #fde8e8; color: #8a1a1a; }
+  .badge-ok   { background: #e2f4ea; color: #1a6b35; }
+  .badge-err  { background: #fde8e8; color: #8a1a1a; }
   .badge-wait { background: #f0ede5; color: #888; }
   .progress { height: 3px; background: #e8e6de; border-radius: 2px; margin: 12px 0; overflow: hidden; }
   .progress-bar { height: 100%; background: #3a7fd5; border-radius: 2px; transition: width 0.3s; width: 0%; }
   .log { font-size: 12px; color: #666; font-family: monospace; background: #f4f4f0; border-radius: 8px; padding: 10px 12px; max-height: 130px; overflow-y: auto; white-space: pre-wrap; margin-top: 10px; }
-  .status-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; }
-  .status-ok  { background: #e2f4ea; color: #1a6b35; }
-  .status-err { background: #fde8e8; color: #8a1a1a; }
-  .status-warn { background: #fdf3dc; color: #8a5a00; }
-  code { font-family: monospace; background: #f0ede5; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
   @media (max-width: 500px) { .row2, .row3, .agendas-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -59,13 +71,14 @@
 <div class="container">
   <h1>FlexiBee <span>počítadlo položek</span></h1>
 
-  <div class="card">
-    <div class="card-title">Připojení</div>
+  <!-- Přihlášení -->
+  <div class="card" id="loginCard">
+    <div class="card-title">Přihlášení k serveru</div>
     <div class="status-bar status-warn" id="statusBar">Vyplňte přihlašovací údaje.</div>
-    <div class="row3">
+    <div class="row3" style="margin-bottom:12px;">
       <div class="field">
-        <label>API adresa firmy</label>
-        <input type="text" id="companyUrl" placeholder="https://ucetnictvi-bp0.flexibee.eu/flexi/firma" value="https://ucetnictvi-bp0.flexibee.eu/flexi/ucetnictvi_bp_s_r_o_" />
+        <label>Server</label>
+        <input type="text" id="serverBase" value="https://ucetnictvi-bp0.flexibee.eu" />
       </div>
       <div class="field">
         <label>Uživatel</label>
@@ -76,11 +89,18 @@
         <input type="password" id="flexi_pass" placeholder="••••••••" />
       </div>
     </div>
-    <div style="margin-top:10px;">
-      <button onclick="checkConnection()" style="padding:6px 14px;border:1px solid #d5d3cb;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;">Ověřit připojení</button>
-    </div>
+    <button class="btn" onclick="loadCompanies()">Načíst firmy</button>
   </div>
 
+  <!-- Výběr firmy -->
+  <div class="card" id="companyCard" style="display:none;">
+    <div class="card-title">Výběr firmy</div>
+    <div id="selectedCompany" class="selected-company"></div>
+    <input type="text" class="company-search" id="companySearch" placeholder="Hledat firmu..." oninput="filterCompanies()" />
+    <div class="company-list" id="companyList"></div>
+  </div>
+
+  <!-- Období -->
   <div class="card">
     <div class="card-title">Období</div>
     <div class="row3">
@@ -102,6 +122,7 @@
     </div>
   </div>
 
+  <!-- Agendy -->
   <div class="card">
     <div class="toggle-row">
       <div class="card-title" style="margin-bottom:0;">Agendy</div>
@@ -127,6 +148,7 @@
 </div>
 
 <script>
+const PROXY      = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
 const AGENDAS = [
   { key: 'vydane-faktury',     label: 'Vydané faktury',     endpoint: 'faktura-vydana',  datField: 'datVyst' },
   { key: 'prijate-faktury',    label: 'Přijaté faktury',    endpoint: 'faktura-prijata', datField: 'datVyst' },
@@ -136,13 +158,16 @@ const AGENDAS = [
   { key: 'ostatni-zavazky',    label: 'Ostatní závazky',    endpoint: 'zavazek',         datField: 'datVyst' },
 ];
 
-let selected = new Set(AGENDAS.map(a => a.key));
+let selected       = new Set(AGENDAS.map(a => a.key));
+let allCompanies   = [];
+let selectedDbName = '';
 
-const params = new URLSearchParams(window.location.search);
+// Načti parametry z URL (z FlexiBee tlačítka)
+const params         = new URLSearchParams(window.location.search);
 const companyUrlParam = params.get('companyUrl') || '';
 
-function initParams() {
-  if (companyUrlParam) document.getElementById('companyUrl').value = companyUrlParam;
+function getServerBase() {
+  return document.getElementById('serverBase').value.trim().replace(/\/$/, '');
 }
 
 function getAuthHeader() {
@@ -151,35 +176,75 @@ function getAuthHeader() {
   return 'Basic ' + btoa(user + ':' + pass);
 }
 
-async function checkConnection() {
+function getCompanyUrl() {
+  return `${getServerBase()}/c/${selectedDbName}`;
+}
+
+async function loadCompanies() {
   const bar = document.getElementById('statusBar');
-  const cu  = document.getElementById('companyUrl').value.trim();
-  const user = document.getElementById('flexi_user').value.trim();
-  if (!cu || !user) {
-    bar.className = 'status-bar status-warn';
-    bar.textContent = 'Vyplňte API adresu firmy a přihlašovací údaje.';
-    return;
-  }
   bar.className = 'status-bar status-warn';
-  bar.textContent = 'Ověřuji připojení...';
+  bar.textContent = 'Načítám seznam firem...';
+
+  const url = `${PROXY}/c.json`;
   try {
-    const proxyBase = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
-    const apiPath   = cu.replace(/\/$/, '').replace(/^https?:\/\/[^/]+/, '');
-    const resp = await fetch(`${proxyBase}${apiPath}/faktura-vydana.json?detail=id&limit=1&add-row-count=true`, {
-      headers: { 'Authorization': getAuthHeader(), 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(5000)
+    const resp = await fetch(url, {
+      headers: { 'Authorization': getAuthHeader(), 'Accept': 'application/json' }
     });
-    if (resp.ok) {
-      bar.className = 'status-bar status-ok';
-      bar.textContent = 'Připojeno: ' + cu;
-    } else {
-      bar.className = 'status-bar status-err';
-      bar.textContent = 'Chyba připojení: HTTP ' + resp.status + ' – zkontrolujte údaje.';
+    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' – zkontrolujte přihlašovací údaje.');
+    const data = await resp.json();
+    allCompanies = (data?.companies?.company || [])
+      .filter(c => c.show === 'true' && c.stavEnum === 'ESTABLISHED')
+      .sort((a, b) => a.nazev.localeCompare(b.nazev, 'cs'));
+
+    bar.className = 'status-bar status-ok';
+    bar.textContent = `Načteno ${allCompanies.length} firem.`;
+    document.getElementById('companyCard').style.display = 'block';
+    renderCompanies(allCompanies);
+
+    // Pokud přišlo companyUrl z FlexiBee, předvyber firmu
+    if (companyUrlParam) {
+      const dbName = companyUrlParam.replace(/\/$/, '').split('/').pop();
+      selectCompany(dbName);
     }
   } catch (e) {
     bar.className = 'status-bar status-err';
-    bar.textContent = 'Nelze se připojit: ' + e.message;
+    bar.textContent = 'Chyba: ' + e.message;
   }
+}
+
+function renderCompanies(list) {
+  const container = document.getElementById('companyList');
+  container.innerHTML = '';
+  list.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'company-item' + (c.dbNazev === selectedDbName ? ' active' : '');
+    el.innerHTML = `<span>${c.nazev}</span><span class="dbname">${c.dbNazev}</span>`;
+    el.onclick = () => selectCompany(c.dbNazev);
+    container.appendChild(el);
+  });
+}
+
+function filterCompanies() {
+  const q = document.getElementById('companySearch').value.toLowerCase();
+  const filtered = allCompanies.filter(c =>
+    c.nazev.toLowerCase().includes(q) || c.dbNazev.toLowerCase().includes(q)
+  );
+  renderCompanies(filtered);
+}
+
+function selectCompany(dbName) {
+  selectedDbName = dbName;
+  const company  = allCompanies.find(c => c.dbNazev === dbName);
+  const label    = company ? company.nazev : dbName;
+  const el       = document.getElementById('selectedCompany');
+  el.style.display = 'block';
+  el.textContent   = 'Vybraná firma: ' + label;
+  renderCompanies(allCompanies.filter(c => {
+    const q = document.getElementById('companySearch').value.toLowerCase();
+    return !q || c.nazev.toLowerCase().includes(q) || c.dbNazev.toLowerCase().includes(q);
+  }));
+  // Skrýt výsledky při přepnutí firmy
+  document.getElementById('results').style.display = 'none';
 }
 
 function initAgendas() {
@@ -231,13 +296,13 @@ function log(msg) {
   box.scrollTop = box.scrollHeight;
 }
 
-async function fetchCount(companyUrl, agenda, dateFrom, dateTo) {
-  const filter    = `(${agenda.datField}>='${dateFrom}' and ${agenda.datField}<='${dateTo}')`;
-  const proxyBase = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
-  const apiPath   = companyUrl.replace(/\/$/, '').replace(/^https?:\/\/[^/]+/, '');
-  const url       = `${proxyBase}${apiPath}/${agenda.endpoint}/${encodeURIComponent(filter)}.json?detail=id&limit=1&add-row-count=true`;
-  const t0        = Date.now();
-  const resp      = await fetch(url, {
+async function fetchCount(agenda, dateFrom, dateTo) {
+  const companyUrl = getCompanyUrl();
+  const filter     = `(${agenda.datField}>='${dateFrom}' and ${agenda.datField}<='${dateTo}')`;
+  const apiPath    = `/c/${selectedDbName}`;
+  const url        = `${PROXY}${apiPath}/${agenda.endpoint}/${encodeURIComponent(filter)}.json?detail=id&limit=1&add-row-count=true`;
+  const t0         = Date.now();
+  const resp       = await fetch(url, {
     headers: { 'Authorization': getAuthHeader(), 'Accept': 'application/json' }
   });
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -247,14 +312,9 @@ async function fetchCount(companyUrl, agenda, dateFrom, dateTo) {
 }
 
 async function runCalc() {
-  const companyUrl = document.getElementById('companyUrl').value.trim();
-  const user       = document.getElementById('flexi_user').value.trim();
-  const pass       = document.getElementById('flexi_pass').value;
-  const range      = getDateRange();
-
-  if (!companyUrl || !user || !pass) { alert('Vyplňte API adresu firmy, uživatele a heslo.'); return; }
+  if (!selectedDbName) { alert('Nejdříve vyberte firmu ze seznamu.'); return; }
+  const range = getDateRange();
   if (!range) { alert('Zvolte prosím období.'); return; }
-
   const activeAgendas = AGENDAS.filter(a => selected.has(a.key));
   if (!activeAgendas.length) { alert('Vyberte alespoň jednu agendu.'); return; }
 
@@ -265,8 +325,9 @@ async function runCalc() {
   document.getElementById('runBtn').disabled        = true;
   document.getElementById('progBar').style.width    = '5%';
 
+  const company = allCompanies.find(c => c.dbNazev === selectedDbName);
+  log('Firma:   ' + (company ? company.nazev : selectedDbName));
   log('Období: ' + range.from + ' až ' + range.to);
-  log('Firma:  ' + companyUrl);
   log('─────────────────────────────────────────');
 
   let totalCount = 0, errors = 0;
@@ -278,7 +339,7 @@ async function runCalc() {
     document.getElementById('detailBody').appendChild(tr);
     log('Načítám ' + a.label + '…');
     try {
-      const res = await fetchCount(companyUrl, a, range.from, range.to);
+      const res = await fetchCount(a, range.from, range.to);
       totalCount += res.count;
       tr.innerHTML = `<td>${a.label}</td><td><strong>${res.count.toLocaleString('cs-CZ')}</strong></td><td><span class="badge badge-ok">ok</span></td><td>${res.elapsed} s</td>`;
       log('  ✓ ' + res.count.toLocaleString('cs-CZ') + ' položek');
@@ -294,10 +355,11 @@ async function runCalc() {
   log('─────────────────────────────────────────');
   log('Celkem: ' + totalCount.toLocaleString('cs-CZ') + ' položek' + (errors ? ' | ' + errors + ' agenda(y) s chybou' : ''));
 
+  const company2 = allCompanies.find(c => c.dbNazev === selectedDbName);
   document.getElementById('metricsGrid').innerHTML = `
     <div class="metric"><div class="metric-label">Celkem položek</div><div class="metric-value">${totalCount.toLocaleString('cs-CZ')}</div><div class="metric-sub">za ${range.label}</div></div>
     <div class="metric"><div class="metric-label">Úspěšné agendy</div><div class="metric-value">${activeAgendas.length - errors} / ${activeAgendas.length}</div><div class="metric-sub">${errors ? errors + ' s chybou' : 'vše ok'}</div></div>
-    <div class="metric"><div class="metric-label">Firma</div><div class="metric-value" style="font-size:14px;padding-top:6px;">${companyUrl.split('/').pop()}</div><div class="metric-sub">${companyUrl.split('/')[2]}</div></div>
+    <div class="metric"><div class="metric-label">Firma</div><div class="metric-value" style="font-size:13px;padding-top:6px;line-height:1.4;">${company2 ? company2.nazev : selectedDbName}</div></div>
   `;
   document.getElementById('runBtn').disabled = false;
 }
@@ -307,7 +369,6 @@ const now = new Date();
 document.getElementById('monthFrom').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 document.getElementById('monthTo').value   = document.getElementById('monthFrom').value;
 initAgendas();
-initParams();
 </script>
 </body>
 </html>
