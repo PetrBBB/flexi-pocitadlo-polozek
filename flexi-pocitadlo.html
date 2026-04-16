@@ -154,7 +154,9 @@ async function checkConnection() {
   bar.className = 'status-bar status-warn';
   bar.textContent = 'Ověřuji připojení...';
   try {
-    const resp = await fetch(`${cu.replace(/\/$/, '')}/faktura-vydana/$count.json`, {
+    const proxyBase = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
+    const apiPath   = cu.replace(/\/$/, '').replace(/^https?:\/\/[^/]+/, '');
+    const resp = await fetch(`${proxyBase}${apiPath}/faktura-vydana/$count.json`, {
       headers: { 'Authorization': `authSessionId ${tok}`, 'Accept': 'application/json' },
       signal: AbortSignal.timeout(5000)
     });
@@ -222,9 +224,11 @@ function log(msg) {
 
 async function fetchCount(companyUrl, token, agenda, dateFrom, dateTo) {
   const filter = `${agenda.datField}>='${dateFrom}' AND ${agenda.datField}<='${dateTo}'`;
-  const url    = `${companyUrl.replace(/\/$/, '')}/${agenda.endpoint}/$count.json?filter=${encodeURIComponent(filter)}`;
-  const t0     = Date.now();
-  const resp   = await fetch(url, {
+  const proxyBase = 'https://wild-term-flexi-proxy.sparkling-scene-3acb.workers.dev';
+  const apiPath   = companyUrl.replace(/\/$/, '').replace(/^https?:\/\/[^/]+/, '');
+  const url       = `${proxyBase}${apiPath}/${agenda.endpoint}/$count.json?filter=${encodeURIComponent(filter)}`;
+  const t0        = Date.now();
+  const resp      = await fetch(url, {
     headers: { 'Authorization': `authSessionId ${token}`, 'Accept': 'application/json' }
   });
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
